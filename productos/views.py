@@ -7,6 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from .tasks import tarea_larga_duracion
+from .tasks import notificar_stock_bajo
 
 from .forms import CategoriaForm, ProductoForm
 from .models import Categoria, Producto
@@ -31,7 +32,8 @@ def producto_create(request):
 	form = ProductoForm(request.POST or None)
 	categoria_count = Categoria.objects.filter(activa=True).count()
 	if request.method == 'POST' and form.is_valid():
-		form.save()
+		producto = form.save()
+		notificar_stock_bajo.delay(producto.id)
 		messages.success(request, 'Producto creado correctamente.')
 		return redirect('productos:producto_list')
 	return render(
@@ -52,7 +54,8 @@ def producto_update(request, pk):
 	form = ProductoForm(request.POST or None, instance=producto)
 	categoria_count = Categoria.objects.filter(activa=True).count()
 	if request.method == 'POST' and form.is_valid():
-		form.save()
+		producto = form.save()
+		notificar_stock_bajo.delay(producto.id)
 		messages.success(request, 'Producto actualizado correctamente.')
 		return redirect('productos:producto_list')
 	return render(

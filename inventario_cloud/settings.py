@@ -141,3 +141,14 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Celery y Redis
 CELERY_BROKER_URL = 'redis://redis:6379/0'
 CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
+
+
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'notificaciones@inventario.local')
+LOW_STOCK_THRESHOLD = int(os.getenv('LOW_STOCK_THRESHOLD', '10'))
+LOW_STOCK_EMAIL_TO = [
+    email.strip()
+    for email in os.getenv('LOW_STOCK_EMAIL_TO', 'alertas@inventario.local').split(',')
+    if email.strip()
+]
