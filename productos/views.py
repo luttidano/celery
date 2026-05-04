@@ -3,6 +3,11 @@ from django.db.models import Count, ProtectedError, Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+
+from .tasks import tarea_larga_duracion
+
 from .forms import CategoriaForm, ProductoForm
 from .models import Categoria, Producto
 
@@ -133,3 +138,10 @@ def categoria_delete(request, pk):
 			)
 		return redirect('productos:categoria_list')
 	return render(request, 'categorias/categoria_confirm_delete.html', {'categoria': categoria})
+
+#Endpoints para tareas asíncronas con Celery
+@csrf_exempt
+@require_POST
+def api_tarea_larga(request):
+    task = tarea_larga_duracion.delay()
+    return JsonResponse({"task_id": task.id, "status": "queued"}, status=202)
