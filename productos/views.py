@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
-from .tasks import tarea_larga_duracion, notificar_stock_bajo, generar_reporte_inventario_pdf
+from .tasks import notificar_stock_bajo, generar_reporte_inventario_pdf
 
 
 from .forms import CategoriaForm, ProductoForm
@@ -145,13 +145,6 @@ def categoria_delete(request, pk):
 			)
 		return redirect('productos:categoria_list')
 	return render(request, 'categorias/categoria_confirm_delete.html', {'categoria': categoria})
-
-#Endpoints para tareas asíncronas con Celery
-@csrf_exempt
-@require_POST
-def api_tarea_larga(request):
-    task = tarea_larga_duracion.delay()
-    return JsonResponse({"task_id": task.id, "status": "queued"}, status=202)
 
 
 @csrf_exempt
