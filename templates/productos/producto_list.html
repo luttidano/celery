@@ -8,7 +8,10 @@
         <h1 class="section-title">Inventario de productos</h1>
         <p class="section-subtitle">Controla stock, categorias y precios con una vista centralizada.</p>
     </div>
-    <a class="btn btn-brand" href="{% url 'productos:producto_create' %}">Agregar producto</a>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-soft" href="{% url 'productos:reporte_inventario_pdf' %}">Generar reporte</a>
+        <a class="btn btn-brand" href="{% url 'productos:producto_create' %}">Agregar producto</a>
+    </div>
 </div>
 
 <div class="metric-grid">

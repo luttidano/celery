@@ -1,7 +1,12 @@
 from django.contrib import messages
 from django.db.models import Count, ProtectedError, Sum
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+
+from datetime import datetime
+from io import BytesIO
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -148,3 +153,71 @@ def categoria_delete(request, pk):
 def api_tarea_larga(request):
     task = tarea_larga_duracion.delay()
     return JsonResponse({"task_id": task.id, "status": "queued"}, status=202)
+
+def reporte_inventario_pdf(request):
+    productos = list(Producto.objects.select_related('categoria').order_by('nombre'))
+    total_unidades = sum(p.cantidad for p in productos)
+    total_valor = sum((p.cantidad * p.precio) for p in productos)
+
+    buffer = BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=letter)
+    width, height = letter
+
+    margin_x = 40
+    y = height - 50
+
+    pdf.setFont("Helvetica-Bold", 16)
+    pdf.drawString(margin_x, y, "Reporte de inventario")
+    y -= 18
+
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(margin_x, y, f"Generado: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    y -= 22
+
+    pdf.setFont("Helvetica-Bold", 10)
+    pdf.drawString(margin_x, y, "SKU")
+    pdf.drawString(margin_x + 90, y, "Nombre")
+    pdf.drawString(margin_x + 350, y, "Cantidad")
+    pdf.drawString(margin_x + 440, y, "Precio")
+    y -= 14
+
+    pdf.setFont("Helvetica", 10)
+    for producto in productos:
+        if y < 60:
+            pdf.showPage()
+            y = height - 50
+            pdf.setFont("Helvetica-Bold", 10)
+            pdf.drawString(margin_x, y, "SKU")
+            pdf.drawString(margin_x + 90, y, "Nombre")
+            pdf.drawString(margin_x + 350, y, "Cantidad")
+            pdf.drawString(margin_x + 440, y, "Precio")
+            y -= 14
+            pdf.setFont("Helvetica", 10)
+
+        pdf.drawString(margin_x, y, producto.sku)
+        pdf.drawString(margin_x + 90, y, producto.nombre[:32])
+        pdf.drawRightString(margin_x + 400, y, str(producto.cantidad))
+        pdf.drawRightString(margin_x + 520, y, f"${producto.precio}")
+        y -= 14
+
+    if y < 90:
+        pdf.showPage()
+        y = height - 50
+
+    pdf.setFont("Helvetica-Bold", 11)
+    pdf.drawString(margin_x, y, "Resumen")
+    y -= 14
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(margin_x, y, f"Productos: {len(productos)}")
+    y -= 12
+    pdf.drawString(margin_x, y, f"Unidades: {total_unidades}")
+    y -= 12
+    pdf.drawString(margin_x, y, f"Valor total: ${total_valor}")
+
+    pdf.showPage()
+    pdf.save()
+
+    buffer.seek(0)
+    response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
+    response["Content-Disposition"] = 'attachment; filename="reporte_inventario.pdf"'
+    return response

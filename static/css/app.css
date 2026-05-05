@@ -115,6 +115,18 @@ h6,
     margin-top: 0.2rem;
 }
 
+.btn-soft {
+    background: #eef7fb;
+    color: #0f6172;
+    border: 1px solid #cfe5ec;
+}
+
+.btn-soft:hover,
+.btn-soft:focus {
+    background: #e2f1f7;
+    color: #0f6172;
+}
+
 .btn-brand {
     background: linear-gradient(135deg, var(--brand-deep), var(--brand-primary));
     color: #ffffff;
