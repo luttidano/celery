@@ -1,18 +1,17 @@
 from django.contrib import messages
 from django.db.models import Count, ProtectedError, Sum
-from django.http import HttpResponse, JsonResponse
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-
-from datetime import datetime
-from io import BytesIO
-from reportlab.lib.pagesizes import letter
-from reportlab.pdfgen import canvas
+from pathlib import Path
+from celery.result import AsyncResult
+from django.conf import settings
+from django.urls import reverse
 
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
-from .tasks import tarea_larga_duracion
-from .tasks import notificar_stock_bajo
+from .tasks import tarea_larga_duracion, notificar_stock_bajo, generar_reporte_inventario_pdf
+
 
 from .forms import CategoriaForm, ProductoForm
 from .models import Categoria, Producto
@@ -154,70 +153,36 @@ def api_tarea_larga(request):
     task = tarea_larga_duracion.delay()
     return JsonResponse({"task_id": task.id, "status": "queued"}, status=202)
 
-def reporte_inventario_pdf(request):
-    productos = list(Producto.objects.select_related('categoria').order_by('nombre'))
-    total_unidades = sum(p.cantidad for p in productos)
-    total_valor = sum((p.cantidad * p.precio) for p in productos)
 
-    buffer = BytesIO()
-    pdf = canvas.Canvas(buffer, pagesize=letter)
-    width, height = letter
+@csrf_exempt
+@require_POST
+def api_generar_reporte(request):
+    task = generar_reporte_inventario_pdf.delay()
+    status_url = reverse('productos:api_reporte_estado', args=[task.id])
+    return JsonResponse({'task_id': task.id, 'status_url': status_url}, status=202)
 
-    margin_x = 40
-    y = height - 50
 
-    pdf.setFont("Helvetica-Bold", 16)
-    pdf.drawString(margin_x, y, "Reporte de inventario")
-    y -= 18
+@require_GET
+def api_reporte_estado(request, task_id):
+    result = AsyncResult(task_id)
+    if result.successful():
+        data = result.result or {}
+        filename = data.get('filename')
+        if filename:
+            download_url = reverse('productos:reporte_descargar', args=[filename])
+            return JsonResponse({'status': 'ready', 'download_url': download_url})
+        return JsonResponse({'status': 'failed'}, status=500)
 
-    pdf.setFont("Helvetica", 10)
-    pdf.drawString(margin_x, y, f"Generado: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-    y -= 22
+    if result.failed():
+        return JsonResponse({'status': 'failed'}, status=500)
 
-    pdf.setFont("Helvetica-Bold", 10)
-    pdf.drawString(margin_x, y, "SKU")
-    pdf.drawString(margin_x + 90, y, "Nombre")
-    pdf.drawString(margin_x + 350, y, "Cantidad")
-    pdf.drawString(margin_x + 440, y, "Precio")
-    y -= 14
+    return JsonResponse({'status': result.status.lower()})
 
-    pdf.setFont("Helvetica", 10)
-    for producto in productos:
-        if y < 60:
-            pdf.showPage()
-            y = height - 50
-            pdf.setFont("Helvetica-Bold", 10)
-            pdf.drawString(margin_x, y, "SKU")
-            pdf.drawString(margin_x + 90, y, "Nombre")
-            pdf.drawString(margin_x + 350, y, "Cantidad")
-            pdf.drawString(margin_x + 440, y, "Precio")
-            y -= 14
-            pdf.setFont("Helvetica", 10)
 
-        pdf.drawString(margin_x, y, producto.sku)
-        pdf.drawString(margin_x + 90, y, producto.nombre[:32])
-        pdf.drawRightString(margin_x + 400, y, str(producto.cantidad))
-        pdf.drawRightString(margin_x + 520, y, f"${producto.precio}")
-        y -= 14
-
-    if y < 90:
-        pdf.showPage()
-        y = height - 50
-
-    pdf.setFont("Helvetica-Bold", 11)
-    pdf.drawString(margin_x, y, "Resumen")
-    y -= 14
-    pdf.setFont("Helvetica", 10)
-    pdf.drawString(margin_x, y, f"Productos: {len(productos)}")
-    y -= 12
-    pdf.drawString(margin_x, y, f"Unidades: {total_unidades}")
-    y -= 12
-    pdf.drawString(margin_x, y, f"Valor total: ${total_valor}")
-
-    pdf.showPage()
-    pdf.save()
-
-    buffer.seek(0)
-    response = HttpResponse(buffer.getvalue(), content_type="application/pdf")
-    response["Content-Disposition"] = 'attachment; filename="reporte_inventario.pdf"'
-    return response
+@require_GET
+def reporte_descargar(request, filename):
+    reports_dir = Path(settings.REPORTS_DIR).resolve()
+    file_path = (reports_dir / filename).resolve()
+    if reports_dir not in file_path.parents or not file_path.exists():
+        raise Http404('Reporte no encontrado')
+    return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=filename)

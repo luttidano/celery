@@ -22,5 +22,7 @@ from productos import views
 urlpatterns = [
     path('', include('productos.urls')),
     path('admin/', admin.site.urls),
-    path('reportes/inventario/', views.reporte_inventario_pdf, name='reporte_inventario_pdf'),
+    path("api/reportes/inventario/", views.api_generar_reporte, name="api_generar_reporte"),
+    path("api/reportes/inventario/<str:task_id>/", views.api_reporte_estado, name="api_reporte_estado"),
+    path("reportes/inventario/descargar/<str:filename>/", views.reporte_descargar, name="reporte_descargar"),
 ]
