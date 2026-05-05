@@ -152,3 +152,9 @@ LOW_STOCK_EMAIL_TO = [
     for email in os.getenv('LOW_STOCK_EMAIL_TO', 'alertas@inventario.local').split(',')
     if email.strip()
 ]
+
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.example.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in {'1', 'true', 'yes'}
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
