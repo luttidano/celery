@@ -15,4 +15,5 @@ urlpatterns = [
     path('categorias/<int:pk>/editar/', views.categoria_update, name='categoria_update'),
     path('categorias/<int:pk>/eliminar/', views.categoria_delete, name='categoria_delete'),
     path("api/tarea-larga/", views.api_tarea_larga, name="api_tarea_larga"),
+    path("reportes/inventario/", views.reporte_inventario_pdf, name="reporte_inventario_pdf"),
 ]
